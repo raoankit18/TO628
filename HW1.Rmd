@@ -1,0 +1,180 @@
+---
+title: "Homework Assignment 1"
+author: "Ankit Rao, Credits: Dushyanth Nutulapati"
+date: 'Assigned: Oct 24, 2020, Due Sun Nov 01, 2020 11:59PM'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+# Reading and Cleaning Data
+```{r, cache=TRUE}
+nyc<-read.csv("nycflights.csv")
+
+#Cleaning data
+str(nyc)
+
+# Factorize columns that need to be a factor
+nyc$origin<-as.factor(nyc$origin)
+nyc$tailnum<-as.factor(nyc$tailnum)
+nyc$month<-as.factor(nyc$month)
+nyc$dest<-as.factor(nyc$dest)
+nyc$carrier<-as.factor(nyc$carrier)
+nyc$flight<-as.factor(nyc$flight)
+
+# Re-check data
+str(nyc)
+summary(nyc)
+```
+
+# Basic Exploration
+
+```{r}
+# Using nlevels(nyc$carrier)
+```
+There are `r nlevels(nyc$carrier)` airlines
+
+```{r}
+# Using nrow(nyc[nyc$carrier=="OO",])
+```
+There are `r nrow(nyc[nyc$carrier=="OO",])` flights with airline code "00"
+
+```{r}
+# Using min(nyc$air_time, na.rm = TRUE)
+```
+The shortest flight out of any NYC airport is `r min(nyc$air_time, na.rm = TRUE)` minutes long
+```{r}
+# Using nrow(nyc[nyc$carrier=="UA" & nyc$year==2013& nyc$month==1 & nyc$day==13, ])
+```
+United Airlines on Jan 12th 2013 flew `r nrow(nyc[nyc$carrier=="UA" & nyc$year==2013& nyc$month==1 & nyc$day==13, ])` flights
+
+# Arrival Delay
+
+```{r}
+#The average arrival delay in Jan 2013 is
+round(mean(nyc[nyc$year==2013 & nyc$month==1, ]$arr_delay, na.rm = TRUE),2) #minutes
+
+# The median arrival delay in Jan 2013 is
+
+round(median(nyc[nyc$year==2013 & nyc$month==1, ]$arr_delay, na.rm = TRUE),2) #minutes
+
+```
+
+Based on the values of mean and median the distribution of arrival delays is right-skewed as mean is significantly higher than median
+
+
+# Airline Performance
+
+```{r}
+# average arrival delays by airline
+
+arr_delay<-tapply(nyc$arr_delay,nyc$carrier,mean,na.rm=TRUE)
+
+barplot(tapply(nyc$arr_delay,nyc$carrier,mean,na.rm=TRUE))
+
+```
+THe airline with highest average arrival delay is `r round(max(arr_delay),2)` and the airline with smallest average arrival delay is `r round(min(arr_delay),2)` and there are `r length(arr_delay[arr_delay<0])` airlines with negative average delays namely `r names(arr_delay[arr_delay<0])`
+
+
+# Air Gain
+
+```{r}
+nyc$airgain<-nyc$dep_delay-nyc$arr_delay
+
+airgain_avg<-tapply(nyc$airgain, nyc$carrier, mean, na.rm=TRUE)
+
+barplot(airgain_avg)
+
+```
+
+On average most airlines gain time in the air after departure as we can see `r round(100*length(airgain_avg[airgain_avg>0])/length(airgain_avg),2)`% airlines have positive gains
+
+There are only `r nrow(airgain_avg[airgain_avg<0])` airlines which have negative airgains and they are `r round(airgain_avg[airgain_avg<0],2)` 
+
+# Merging Data Frames
+
+```{r message=FALSE}
+library(dplyr)
+planes<-read.csv("planes.csv")
+# Planes data cleaning
+planes$year<-as.factor(planes$year)
+
+merged<-merge(nyc, planes , by.x = "tailnum", by.y = "tailnum")
+
+# Who are the top 5 manufacturers of plane from NYC?
+flight_manuf<-merged %>% count(manufacturer)
+flight_manuf<-flight_manuf[order(flight_manuf$n,decreasing = TRUE),]
+```
+Q1) Who are the top 5 manufacturers of plane from NYC?
+
+The top 5 manufactures of all flights going through NYC are
+
+```{r}
+top_n(flight_manuf,5)
+
+```
+
+
+```{r}
+# What is the category of seat capacity flowing through NYC?
+merged$seats<-as.factor(merged$seats)
+nlevels(merged$seats)
+flight_seats<-merged %>% count(seats)
+flight_seats<-flight_seats[order(flight_seats$n,decreasing = TRUE),]
+
+```
+Q2) What is the category of seat capacity flowing through NYC?
+
+The top 3 seating categories of all flights going through NYC are 
+```{r}
+top_n(flight_seats,3)
+```
+
+```{r}
+# What is the average airtime across top 3 seating categories of flights?
+airtimebycapacity<-aggregate(merged$air_time, list(merged$seats), mean, na.rm=TRUE)
+capac_airtime<-airtimebycapacity%>%rename(seat_cat=Group.1,
+                           airtime_avg=x)
+capacity_merged<-merge(capac_airtime, flight_seats , by.x = "seat_cat", by.y = "seats")
+capacity_merged<-capacity_merged[order(capacity_merged$n,decreasing = TRUE),]
+
+```
+Q3) What is the average airtime across top 3 seating categories of flights?
+
+The average airtime of top 3 seating categories of all flights going through NYC are 
+```{r}
+top_n(capacity_merged,3)
+```
+
+```{r}
+# Which manufacturer has maximum number of fixed wing multi-engine aircrafts
+engine_type<-select(merged,type,manufacturer)%>%count(type,manufacturer)
+engine_type<-engine_type[order(engine_type$n,decreasing = TRUE),]
+
+```
+Q4) Which manufacturer has maximum number of fixed wing multi-engine aircrafts?
+
+The top manufacturer of fixed wing multi-engine aircraft is 
+
+```{r}
+top_n(engine_type,1)
+
+```
+Q5) What is the average airtime by engine type?
+
+
+```{r}
+airtime_model<-tapply(merged$air_time,merged$type,mean,na.rm=TRUE)
+
+barplot(airtime_model)
+
+```
+
